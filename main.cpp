@@ -241,7 +241,7 @@ int compute_metro(char* path1, int size1, char* path2, int size2, int nbSample)
 
     // Output the results
     const double percentage = 0.95;
-    cout << "# Number of point sampled on each cloud : " << nbSample << endl;
+    cout << "# Number of point sampled on each mesh : " << nbSample << endl;
     cout << "# Distance d such as 95% NN distances are under d" << endl;
     cout << "# Mesh 1 reference; Mesh 2 query (precision if Mesh 1 is ground truth) : " << endl;
     auto itOne = nnDistancesOne.begin();
