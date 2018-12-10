@@ -110,11 +110,9 @@
           var fr1 = new FileReader();
           var fr2 = new FileReader();
           fr1.onload = function () {
-              var data = new Uint8Array(fr1.result);
               ready1 = true;
           };  
           fr2.onload = function() { 
-            var data2 = new Uint8Array(fr2.result);
             ready2 = true;
           };
           var firstTime = true;
