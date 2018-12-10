@@ -22,6 +22,7 @@ using namespace std;
 
 
 struct float3 { float x, y, z; };
+struct double3 { double x, y, z; };
 struct uint3 { uint32_t x, y, z; };
 
 typedef Eigen::Vector3d Point;
@@ -88,14 +89,39 @@ vector<Triangle> loadTrianglesFromPly(istream& ss)
         try { vertices = file.request_properties_from_element("vertex", { "x", "y", "z" }); }
         catch (const exception & e) { cerr << "tinyply exception: " << e.what() << endl; }
 
-        try { faces = file.request_properties_from_element("face", { "vertex_index" }); }
-        catch (const exception & e) { cerr << "tinyply exception: " << e.what() << endl; }
+        try 
+        { 
+          faces = file.request_properties_from_element("face", { "vertex_index" }); 
+        }
+        catch (const exception & e) 
+        {
+          try 
+          { 
+            faces = file.request_properties_from_element("face", { "vertex_indices" }); 
+          } 
+          catch (const exception & e)
+          {
+            cout << "tinyply exception: " << e.what() << endl; 
+          }
+        }
 
         file.read(ss);
 
         const size_t numVerticesBytes = vertices->buffer.size_bytes();
         vector<float3> verts(vertices->count);
-        memcpy(verts.data(), vertices->buffer.get(), numVerticesBytes);
+        if(vertices->t == Type::FLOAT64)
+        {
+            vector<double3> vertsTemp(vertices->count);
+            memcpy(vertsTemp.data(), vertices->buffer.get(), numVerticesBytes);
+            for(int i=0; i<vertsTemp.size(); i++)
+            {
+                verts[i].x = static_cast<float>(vertsTemp[i].x);
+                verts[i].y = static_cast<float>(vertsTemp[i].y);
+                verts[i].z = static_cast<float>(vertsTemp[i].z);
+            }
+        }
+        else
+            memcpy(verts.data(), vertices->buffer.get(), numVerticesBytes);
 
         const size_t numFacesBytes = faces->buffer.size_bytes();
         vector<uint3> facs(faces->count);
@@ -190,7 +216,6 @@ int EMSCRIPTEN_KEEPALIVE compute_metro(char* path1, int size1, char* path2, int 
 int compute_metro(char* path1, int size1, char* path2, int size2, int nbSample)
 #endif
 {
-
     string sFileOne(path1, size1);
     istringstream issOne(sFileOne);
     istream& fileOne(issOne);
@@ -226,6 +251,15 @@ int compute_metro(char* path1, int size1, char* path2, int size2, int nbSample)
     auto itTwo = nnDistancesTwo.begin();
     advance(itTwo, int(percentage*(nnDistancesTwo.size()-1)));
     cout << *itTwo << endl;
+    cout << "# Average of all measurement (mean metro)" << endl;
+    double average = 0.;
+    for(const auto &measurement : nnDistancesOne)
+        average += measurement;
+    for(const auto &measurement : nnDistancesTwo)
+        average += measurement;
+    cout << average / double(nnDistancesOne.size() + nnDistancesTwo.size()) << endl;
+    cout << "# Max measurement (metro distance)" << endl;
+    cout << max(*nnDistancesOne.rbegin(), *nnDistancesTwo.rbegin()) << endl;
 
     return 0;
 }
