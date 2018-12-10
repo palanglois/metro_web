@@ -1,6 +1,6 @@
 # Web Metro Distance
 
-##Compiling instructions
+## Compiling instructions
 
 Web assembly version of the metro distance.
 
@@ -27,7 +27,7 @@ The resulting html page can be displayed with Firefox for example :
 
 `firefox build_wasm/content_metro.html`
 
-##Compiling as a stand-alone C++ executable
+## Compiling as a stand-alone C++ executable
 
 A CMakeLists.txt is provided in order to compile the program as a stand-alone C++ executable. 
 It does not compile the program in WebAssembly.
