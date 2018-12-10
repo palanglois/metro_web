@@ -1,7 +1,7 @@
 CC=emcc
 DEPS=external
 OUT_DIR=./build_wasm
-OUT_DIR=/home/langlois/Documents/perso-site
+#OUT_DIR=/home/langlois/Documents/perso-site
 OUT_NAME=content_metro
 
 all: $(OUT_NAME).html
