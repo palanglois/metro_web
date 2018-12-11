@@ -120,9 +120,9 @@
             if(firstTime) {$('#output')[0].value += "Processing...\n";}
             if(ready1 && ready2)
             {
-              var buffer1 = Module._malloc(fr1.result.length + 1);
+              var buffer1 = Module._malloc(4*fr1.result.length + 1);
               Module.stringToUTF8(fr1.result, buffer1, fr1.result.length + 1);
-              var buffer2 = Module._malloc(fr2.result.length + 1);
+              var buffer2 = Module._malloc(4*fr2.result.length + 1);
               Module.stringToUTF8(fr2.result, buffer2, fr2.result.length + 1);
               $('#output')[0].value += "Memory allocated !\nProcessing metro distance...\n";
               var result = Module.ccall('compute_metro', // name of C function 
