@@ -148,6 +148,9 @@ vector<Triangle> loadTrianglesFromPly(istream& ss)
 
 #ifdef IS_PARALLEL
 void sampleSinglePoint(int id, PointCloud* sampledPoints, const vector<double>* cumulatedAreas, const vector<Triangle>* mesh, int i)
+#else
+inline void sampleSinglePoint(int id, PointCloud* sampledPoints, const vector<double>* cumulatedAreas, const vector<Triangle>* mesh, int i)
+#endif
 {
     // Select a random triangle according to the areas distribution
     double r = ((double) rand() / (RAND_MAX));
@@ -181,51 +184,24 @@ PointCloud samplePointsOnMesh(const vector<Triangle>& mesh, int nbSamples)
         cumulatedArea /= accum;
     // Actual sampling
     PointCloud sampledPoints(nbSamples, 3);
+#ifdef IS_PARALLEL
     ctpl::thread_pool p(8);
+#endif
     for(int i=0; i < nbSamples; i++)
+#ifdef IS_PARALLEL
         p.push(sampleSinglePoint, &sampledPoints, &cumulatedAreas, &mesh, i);
     p.stop(true);
-    return sampledPoints;
-}
 #else
-PointCloud samplePointsOnMesh(const vector<Triangle>& mesh, int nbSamples)
-{
-    // Build the cumulated areas histogram
-    vector<double> cumulatedAreas;
-    double accum(0);
-    for(const auto triangle: mesh)
-    {
-        accum += triangle.getArea();
-        cumulatedAreas.push_back(accum);
-    }
-    // Normalize it
-    for(double &cumulatedArea: cumulatedAreas)
-        cumulatedArea /= accum;
-    // Actual sampling
-    PointCloud sampledPoints(nbSamples, 3);
-    for(int i=0; i < nbSamples; i++)
-    {
-        // Select a random triangle according to the areas distribution
-        double r = ((double) rand() / (RAND_MAX));
-        size_t found_index = 0;
-        for(size_t j=0; j<cumulatedAreas.size() && r > cumulatedAreas[j]; j++)
-            found_index = j+1;
-
-        // Draw a random point in this triangle
-        double r1 = ((double) rand() / (RAND_MAX));
-        double r2 = ((double) rand() / (RAND_MAX));
-        Point A = mesh[found_index].getA();
-        Point B = mesh[found_index].getB();
-        Point C = mesh[found_index].getC();
-        Point P = (1 - sqrt(r1)) * A + (sqrt(r1) * (1 - r2)) * B + (sqrt(r1) * r2) * C;
-        sampledPoints.row(i) = P;
-    }
+        sampleSinglePoint(0, &sampledPoints, &cumulatedAreas, &mesh, i);
+#endif
     return sampledPoints;
 }
-#endif
 
 #ifdef IS_PARALLEL
 void findPointDistance(int id, multiset<double>* allDistances, mutex* myMutex, const PointCloud* queryPointCloud, const EigenKdTree* refTree, int i)
+#else
+inline void findPointDistance(int id, multiset<double>* allDistances, const PointCloud* queryPointCloud, const EigenKdTree* refTree, int i)
+#endif
 {
     const size_t num_results = 1;
     vector<size_t> ret_indexes(num_results);
@@ -235,9 +211,13 @@ void findPointDistance(int id, multiset<double>* allDistances, mutex* myMutex, c
     Point queryPoint = queryPointCloud->row(i);
     refTree->index->findNeighbors(resultSet, &queryPoint[0],
                                  nanoflann::SearchParams(10));
+#ifdef IS_PARALLEL
     myMutex->lock();
+#endif
     allDistances->insert(sqrt(out_dists_sqr[0]));
+#ifdef IS_PARALLEL
     myMutex->unlock();
+#endif
 }
 
 multiset<double> findPcDistance(const PointCloud& refPointCloud, const PointCloud& queryPointCloud)
@@ -249,38 +229,19 @@ multiset<double> findPcDistance(const PointCloud& refPointCloud, const PointClou
 
     // do a knn search
     multiset<double> allDistances;
+#ifdef IS_PARALLEL
     mutex myMutex;
     ctpl::thread_pool p(8);
+#endif
     for(int i=0; i < queryPointCloud.rows(); i++)
+#ifdef IS_PARALLEL
         p.push(findPointDistance, &allDistances, &myMutex,&queryPointCloud, &refTree, i);
     p.stop(true);
-    return allDistances;
-}
 #else
-multiset<double> findPcDistance(const PointCloud& refPointCloud, const PointCloud& queryPointCloud)
-{
-    // Build the kd-tree for the reference Point Cloud
-    const int dim = 3;
-    const int maxLeaf = 10;
-    EigenKdTree refTree(dim, cref(refPointCloud), maxLeaf);
-
-    // do a knn search
-    const size_t num_results = 1;
-    multiset<double> allDistances;
-    for(int i=0; i < queryPointCloud.rows(); i++)
-    {
-        vector<size_t> ret_indexes(num_results);
-        vector<double> out_dists_sqr(num_results);
-        nanoflann::KNNResultSet<double> resultSet(num_results);
-        resultSet.init(&ret_indexes[0], &out_dists_sqr[0]);
-        Point queryPoint = queryPointCloud.row(i);
-        refTree.index->findNeighbors(resultSet, &queryPoint[0],
-                                       nanoflann::SearchParams(10));
-        allDistances.insert(sqrt(out_dists_sqr[0]));
-    }
+        findPointDistance(0, &allDistances, &queryPointCloud, &refTree, i);
+#endif
     return allDistances;
 }
-#endif
 
 #ifdef __cplusplus
 extern "C" {
