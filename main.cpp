@@ -12,6 +12,9 @@
 #include "Eigen/Dense"
 #include "tinyply/tinyply.h"
 #include "nanoflann/nanoflann.hpp"
+#ifdef IS_PARALLEL
+#include "ctpl/ctpl_stl.h"
+#endif
 
 //Emscripten
 #ifdef EMCC
@@ -143,6 +146,26 @@ vector<Triangle> loadTrianglesFromPly(istream& ss)
     }
 }
 
+#ifdef IS_PARALLEL
+void sampleSinglePoint(int id, PointCloud* sampledPoints, const vector<double>* cumulatedAreas, const vector<Triangle>* mesh, int i)
+{
+    // Select a random triangle according to the areas distribution
+    double r = ((double) rand() / (RAND_MAX));
+    size_t found_index = 0;
+    for(size_t j=0; j<cumulatedAreas->size() && r > cumulatedAreas->at(j); j++)
+        found_index = j+1;
+
+    // Draw a random point in this triangle
+    double r1 = ((double) rand() / (RAND_MAX));
+    double r2 = ((double) rand() / (RAND_MAX));
+    Point A = mesh->at(found_index).getA();
+    Point B = mesh->at(found_index).getB();
+    Point C = mesh->at(found_index).getC();
+    Point P = (1 - sqrt(r1)) * A + (sqrt(r1) * (1 - r2)) * B + (sqrt(r1) * r2) * C;
+    sampledPoints->row(i) = P;
+
+}
+
 PointCloud samplePointsOnMesh(const vector<Triangle>& mesh, int nbSamples)
 {
     // Build the cumulated areas histogram
@@ -158,7 +181,28 @@ PointCloud samplePointsOnMesh(const vector<Triangle>& mesh, int nbSamples)
         cumulatedArea /= accum;
     // Actual sampling
     PointCloud sampledPoints(nbSamples, 3);
-#pragma omp parallel for
+    ctpl::thread_pool p(8);
+    for(int i=0; i < nbSamples; i++)
+        p.push(sampleSinglePoint, &sampledPoints, &cumulatedAreas, &mesh, i);
+    p.stop(true);
+    return sampledPoints;
+}
+#else
+PointCloud samplePointsOnMesh(const vector<Triangle>& mesh, int nbSamples)
+{
+    // Build the cumulated areas histogram
+    vector<double> cumulatedAreas;
+    double accum(0);
+    for(const auto triangle: mesh)
+    {
+        accum += triangle.getArea();
+        cumulatedAreas.push_back(accum);
+    }
+    // Normalize it
+    for(double &cumulatedArea: cumulatedAreas)
+        cumulatedArea /= accum;
+    // Actual sampling
+    PointCloud sampledPoints(nbSamples, 3);
     for(int i=0; i < nbSamples; i++)
     {
         // Select a random triangle according to the areas distribution
@@ -174,10 +218,26 @@ PointCloud samplePointsOnMesh(const vector<Triangle>& mesh, int nbSamples)
         Point B = mesh[found_index].getB();
         Point C = mesh[found_index].getC();
         Point P = (1 - sqrt(r1)) * A + (sqrt(r1) * (1 - r2)) * B + (sqrt(r1) * r2) * C;
-#pragma omp critical
         sampledPoints.row(i) = P;
     }
     return sampledPoints;
+}
+#endif
+
+#ifdef IS_PARALLEL
+void findPointDistance(int id, multiset<double>* allDistances, mutex* myMutex, const PointCloud* queryPointCloud, const EigenKdTree* refTree, int i)
+{
+    const size_t num_results = 1;
+    vector<size_t> ret_indexes(num_results);
+    vector<double> out_dists_sqr(num_results);
+    nanoflann::KNNResultSet<double> resultSet(num_results);
+    resultSet.init(&ret_indexes[0], &out_dists_sqr[0]);
+    Point queryPoint = queryPointCloud->row(i);
+    refTree->index->findNeighbors(resultSet, &queryPoint[0],
+                                 nanoflann::SearchParams(10));
+    myMutex->lock();
+    allDistances->insert(sqrt(out_dists_sqr[0]));
+    myMutex->unlock();
 }
 
 multiset<double> findPcDistance(const PointCloud& refPointCloud, const PointCloud& queryPointCloud)
@@ -188,9 +248,25 @@ multiset<double> findPcDistance(const PointCloud& refPointCloud, const PointClou
     EigenKdTree refTree(dim, cref(refPointCloud), maxLeaf);
 
     // do a knn search
+    multiset<double> allDistances;
+    mutex myMutex;
+    ctpl::thread_pool p(8);
+    for(int i=0; i < queryPointCloud.rows(); i++)
+        p.push(findPointDistance, &allDistances, &myMutex,&queryPointCloud, &refTree, i);
+    p.stop(true);
+    return allDistances;
+}
+#else
+multiset<double> findPcDistance(const PointCloud& refPointCloud, const PointCloud& queryPointCloud)
+{
+    // Build the kd-tree for the reference Point Cloud
+    const int dim = 3;
+    const int maxLeaf = 10;
+    EigenKdTree refTree(dim, cref(refPointCloud), maxLeaf);
+
+    // do a knn search
     const size_t num_results = 1;
     multiset<double> allDistances;
-#pragma omp parallel for
     for(int i=0; i < queryPointCloud.rows(); i++)
     {
         vector<size_t> ret_indexes(num_results);
@@ -200,11 +276,11 @@ multiset<double> findPcDistance(const PointCloud& refPointCloud, const PointClou
         Point queryPoint = queryPointCloud.row(i);
         refTree.index->findNeighbors(resultSet, &queryPoint[0],
                                        nanoflann::SearchParams(10));
-#pragma omp critical
         allDistances.insert(sqrt(out_dists_sqr[0]));
     }
     return allDistances;
 }
+#endif
 
 #ifdef __cplusplus
 extern "C" {
