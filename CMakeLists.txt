@@ -7,7 +7,6 @@ set(CMAKE_CXX_STANDARD 11)
 
 add_definitions(-DTINYPLY_IMPLEMENTATION=1)
 
-message(${BUILD_PARALLEL_CODE})
 if(BUILD_PARALLEL_CODE)
     add_definitions(-DIS_PARALLEL=1)
     find_package(Threads)

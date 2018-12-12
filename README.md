@@ -35,7 +35,7 @@ It does not compile the program in WebAssembly.
 ## Note about parallalization
 
 This application has a multi-processor implementation which can be activated by changing the flag 
-`PARALLEL=0` to `PARALLEL=1` is the Makefile (and execute cmake with the `-DBUILD_PARALLEL_CODE=1` 
-option). However, as of today (Dec. 12th, 2018), most internet browsers have stopped 
-supporting multi-threaded parallel computing because of the SPECTRE vulnerability (read more 
-[here](https://kripken.github.io/emscripten-site/docs/porting/pthreads.html)).
+`PARALLEL=0` to `PARALLEL=1` is the Makefile (or execute cmake with the `-DBUILD_PARALLEL_CODE=1` 
+option for the stand-alone version). However, as of today (Dec. 12th, 2018), most internet browsers 
+have stopped supporting multi-threaded parallel computing because of the SPECTRE vulnerability 
+(read more [here](https://kripken.github.io/emscripten-site/docs/porting/pthreads.html)).
