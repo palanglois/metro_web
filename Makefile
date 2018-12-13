@@ -3,6 +3,7 @@ OUT_DIR=./build_wasm
 #OUT_DIR=/home/langlois/Documents/perso-site
 PARALLEL=0
 OUT_NAME=content_metro
+DEBUG=0
 
 # Static parameters
 CC=emcc
@@ -17,7 +18,12 @@ EMCC_FLAGS += --shell-file html_template/shell_minimal.html
 # EMCC specific flags
 EMCC_FLAGS += -s NO_EXIT_RUNTIME=1 -s EXTRA_EXPORTED_RUNTIME_METHODS='["ccall", "stringToUTF8"]'
 EMCC_FLAGS += -s EXPORTED_FUNCTIONS="['_free', '_malloc']"
-# EMCC_FLAGS += -s DISABLE_EXCEPTION_CATCHING=0 -s ASSERTIONS=1 # For debug
+
+# EMCC debug FLAGS
+ifeq ($(DEBUG), 1)
+  EMCC_FLAGS += -s DISABLE_EXCEPTION_CATCHING=0 -s ASSERTIONS=1 -O0 # For debug
+  EMCC_FLAGS := $(filter-out -O3,$(EMCC_FLAGS))
+endif
 
 # Single-threaded/Multi-threaded flags
 ifeq ($(PARALLEL), 1)
@@ -34,4 +40,4 @@ $(OUT_NAME).html $(OUT_NAME).js $(OUT_NAME).wasm: main.cpp
 .PHONY: clean
 
 clean:
-	rm $(OUT_DIR)/$(OUT_NAME)* && if [ $(PARALLEL) = 1 ]; then rm $(OUT_DIR)/pthread-main.js; fi
+	rm $(OUT_DIR)/$(OUT_NAME)* && rm -f $(OUT_DIR)/pthread-main.js
