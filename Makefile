@@ -5,13 +5,13 @@ OUT_DIR=./build_wasm
 OUT_NAME=content_metro
 PARALLEL=0
 
-EMCC_FLAGS = -s NO_EXIT_RUNTIME=1 -s EXTRA_EXPORTED_RUNTIME_METHODS='["ccall", "stringToUTF8"]' -s ASSERTIONS=1 -s DISABLE_EXCEPTION_CATCHING=0 -DEMCC=1 -s TOTAL_MEMORY=167772160
+EMCC_FLAGS = -s NO_EXIT_RUNTIME=1 -s EXTRA_EXPORTED_RUNTIME_METHODS='["ccall", "stringToUTF8"]' -s ASSERTIONS=1 -s DISABLE_EXCEPTION_CATCHING=0 -DEMCC=1
 
 
 ifeq ($(PARALLEL), 1)
   EMCC_FLAGS += -s USE_PTHREADS=1 -s PTHREAD_POOL_SIZE=8 -s TOTAL_MEMORY=335544320 -DIS_PARALLEL=1
 else
-  EMCC_FLAGS +=   -s ALLOW_MEMORY_GROWTH=1
+  EMCC_FLAGS += -s TOTAL_MEMORY=167772160 -s ALLOW_MEMORY_GROWTH=1
 endif
 
 all: $(OUT_NAME).html
@@ -22,4 +22,4 @@ $(OUT_NAME).html $(OUT_NAME).js $(OUT_NAME).wasm: main.cpp
 .PHONY: clean
 
 clean:
-	rm $(OUT_DIR)/$(OUT_NAME)* && if [ $(PARALLEL) ]; then rm $(OUT_DIR)/pthread-main.js; fi
+	rm $(OUT_DIR)/$(OUT_NAME)* && if [ $(PARALLEL) = 1 ]; then rm $(OUT_DIR)/pthread-main.js; fi
