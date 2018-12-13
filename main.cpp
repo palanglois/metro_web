@@ -149,7 +149,7 @@ vector<Triangle> loadTrianglesFromPly(istream& ss)
 #ifdef IS_PARALLEL
 void sampleSinglePoint(int id, PointCloud* sampledPoints, const vector<double>* cumulatedAreas, const vector<Triangle>* mesh, int i)
 #else
-inline void sampleSinglePoint(int id, PointCloud* sampledPoints, const vector<double>* cumulatedAreas, const vector<Triangle>* mesh, int i)
+inline void sampleSinglePoint(PointCloud* sampledPoints, const vector<double>* cumulatedAreas, const vector<Triangle>* mesh, int i)
 #endif
 {
     // Select a random triangle according to the areas distribution
@@ -192,7 +192,7 @@ PointCloud samplePointsOnMesh(const vector<Triangle>& mesh, int nbSamples)
         p.push(sampleSinglePoint, &sampledPoints, &cumulatedAreas, &mesh, i);
     p.stop(true);
 #else
-        sampleSinglePoint(0, &sampledPoints, &cumulatedAreas, &mesh, i);
+        sampleSinglePoint(&sampledPoints, &cumulatedAreas, &mesh, i);
 #endif
     return sampledPoints;
 }
@@ -200,7 +200,7 @@ PointCloud samplePointsOnMesh(const vector<Triangle>& mesh, int nbSamples)
 #ifdef IS_PARALLEL
 void findPointDistance(int id, multiset<double>* allDistances, mutex* myMutex, const PointCloud* queryPointCloud, const EigenKdTree* refTree, int i)
 #else
-inline void findPointDistance(int id, multiset<double>* allDistances, const PointCloud* queryPointCloud, const EigenKdTree* refTree, int i)
+inline void findPointDistance(multiset<double>* allDistances, const PointCloud* queryPointCloud, const EigenKdTree* refTree, int i)
 #endif
 {
     const size_t num_results = 1;
@@ -238,7 +238,7 @@ multiset<double> findPcDistance(const PointCloud& refPointCloud, const PointClou
         p.push(findPointDistance, &allDistances, &myMutex,&queryPointCloud, &refTree, i);
     p.stop(true);
 #else
-        findPointDistance(0, &allDistances, &queryPointCloud, &refTree, i);
+        findPointDistance(&allDistances, &queryPointCloud, &refTree, i);
 #endif
     return allDistances;
 }
